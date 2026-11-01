@@ -19,6 +19,10 @@ class AppTheme {
       brightness: brightness,
     );
     final isDark = brightness == Brightness.dark;
+    // Derive text styles from the default typography so they keep the
+    // platform font family (Roboto on Android, SF on iOS).
+    final textTheme =
+        ThemeData(useMaterial3: true, colorScheme: scheme).textTheme;
 
     return ThemeData(
       useMaterial3: true,
@@ -29,7 +33,7 @@ class AppTheme {
         centerTitle: false,
         backgroundColor: isDark ? scheme.surface : scheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
-        titleTextStyle: TextStyle(
+        titleTextStyle: textTheme.titleLarge?.copyWith(
           fontSize: 22,
           fontWeight: FontWeight.w700,
           color: scheme.onSurface,
@@ -73,7 +77,10 @@ class AppTheme {
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -84,7 +91,7 @@ class AppTheme {
         backgroundColor: isDark ? scheme.surfaceContainer : scheme.surface,
         indicatorColor: scheme.primaryContainer,
         labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => TextStyle(
+          (states) => textTheme.labelMedium?.copyWith(
             fontSize: 12,
             fontWeight:
                 states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
