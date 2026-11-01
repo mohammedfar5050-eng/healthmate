@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 // ---- Metric colours: each activity has one meaningful colour across the app ----
 /** Steps – green (movement / activity). */
-val StepsGreen = Color(0xFF2E7D32)
+val StepsGreen = Color(0xFF43A047)
 
 /** Calories – red (energy / heat). */
 val CaloriesRed = Color(0xFFE53935)

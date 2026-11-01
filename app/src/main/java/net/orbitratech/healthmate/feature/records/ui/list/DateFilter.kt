@@ -59,7 +59,11 @@ sealed interface DateFilter {
     }
 
     companion object {
-        val presets: List<DateFilter> = listOf(All, Today, Last7Days, Last30Days)
+        /**
+         * Quick-filter chips. A getter (not a stored property) avoids a class
+         * initialisation cycle between this companion and the nested objects.
+         */
+        val presets: List<DateFilter> get() = listOf(All, Today, Last7Days, Last30Days)
 
         /** Builds a range filter, normalising reversed dates and single days. */
         fun range(a: LocalDate, b: LocalDate): DateFilter {
