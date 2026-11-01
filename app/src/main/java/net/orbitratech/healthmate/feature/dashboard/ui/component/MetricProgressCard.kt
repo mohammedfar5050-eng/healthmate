@@ -22,7 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -112,7 +112,7 @@ fun MetricProgressCard(
 @Composable
 private fun ProgressRing(metric: HealthMetric, progress: Float) {
     // Animate from 0 on first display, then between values on updates.
-    var target by remember { mutableStateOf(0f) }
+    var target by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(progress) { target = progress.coerceIn(0f, 1f) }
     val animated by animateFloatAsState(
         targetValue = target,
