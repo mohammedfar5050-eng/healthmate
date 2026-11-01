@@ -73,6 +73,17 @@ class DateFilter {
               '${AppDateUtils.formatShort(end!)} ${end!.year}',
       };
 
+  /// Phrase used in sentences, e.g. "No entries in the last 7 days".
+  String get phrase => switch (type) {
+        DateFilterType.all => 'yet',
+        DateFilterType.today => 'for today',
+        DateFilterType.last7Days => 'in the last 7 days',
+        DateFilterType.last30Days => 'in the last 30 days',
+        DateFilterType.singleDate => 'on ${AppDateUtils.formatMedium(start!)}',
+        DateFilterType.range => 'between ${AppDateUtils.formatShort(start!)} '
+            'and ${AppDateUtils.formatShort(end!)} ${end!.year}',
+      };
+
   @override
   bool operator ==(Object other) =>
       other is DateFilter &&

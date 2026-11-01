@@ -15,13 +15,11 @@ import 'sample_data.dart';
 /// run against an in-memory database through `sqflite_common_ffi`.
 class DatabaseHelper {
   DatabaseHelper({
-    DatabaseFactory? factory,
-    String? path,
+    this._factory,
+    this._path,
     this.seedSampleData = true,
     DateTime Function()? clock,
-  })  : _factory = factory,
-        _path = path,
-        _clock = clock ?? DateTime.now;
+  }) : _clock = clock ?? DateTime.now;
 
   static const String databaseName = 'healthmate.db';
   static const int databaseVersion = 1;
