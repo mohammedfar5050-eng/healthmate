@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Auto Backup (Android 6–11): back up the health database and preferences. -->
+<full-backup-content>
+    <include domain="database" path="healthmate.db" />
+    <include domain="file" path="datastore/" />
+</full-backup-content>
