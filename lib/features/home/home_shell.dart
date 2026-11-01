@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../dashboard/presentation/screens/dashboard_screen.dart';
+import '../dashboard/presentation/viewmodels/dashboard_viewmodel.dart';
 import '../health_records/presentation/screens/records_screen.dart';
 import '../health_records/presentation/viewmodels/date_filter.dart';
 import '../health_records/presentation/viewmodels/health_records_viewmodel.dart';
@@ -20,8 +21,30 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Refresh when the app returns to the foreground so that "today" is
+  /// correct even if the app was left open overnight.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      context.read<DashboardViewModel>().load(silent: true);
+      context.read<HealthRecordsViewModel>().loadRecords(silent: true);
+    }
+  }
 
   void _select(int index) => setState(() => _index = index);
 
