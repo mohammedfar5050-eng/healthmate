@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import net.orbitratech.healthmate.core.util.Validators
 import net.orbitratech.healthmate.feature.records.data.HealthRecordRepository
 import net.orbitratech.healthmate.feature.records.data.RepositoryException
@@ -63,6 +65,11 @@ data class DashboardUiState(
 
 sealed interface DashboardEvent {
     data class Message(val text: String, val isError: Boolean = false) : DashboardEvent
+
+    /** [ml] of water was added to the entry [recordId]; the snackbar offers Undo. */
+    data class WaterAdded(val ml: Int, val recordId: Long) : DashboardEvent {
+        val text: String get() = "Added $ml ml of water"
+    }
 }
 
 /**
@@ -79,6 +86,9 @@ class DashboardViewModel(
 
     private val today = MutableStateFlow(LocalDate.now(clock))
     private val chartMetric = MutableStateFlow(HealthMetric.STEPS)
+
+    /** Serialises quick-add water taps so rapid presses never overwrite each other. */
+    private val waterMutex = Mutex()
 
     private val _events = Channel<DashboardEvent>(Channel.BUFFERED)
     val events: Flow<DashboardEvent> = _events.receiveAsFlow()
@@ -131,32 +141,52 @@ class DashboardViewModel(
     fun refreshDate() = today.update { LocalDate.now(clock) }
 
     /**
-     * Adds [ml] of water to today's most recent entry, or creates a new
-     * entry for today when nothing has been logged yet.
+     * Logs [ml] of water for today.
+     *
+     * Water from the quick-add buttons is collected in one *water-only* entry
+     * per day (steps and calories are 0), so it never changes an activity
+     * entry the user typed in. A new water entry is started when there is
+     * none yet, or when the current one would exceed the per-entry limit.
      */
     fun quickAddWater(ml: Int) {
         viewModelScope.launch {
             try {
-                val day = LocalDate.now(clock)
-                val latest = repository.observeRecords(day, day).first().firstOrNull() // newest first
-                if (latest == null) {
-                    repository.addRecord(HealthRecord(date = day, water = ml))
-                } else {
-                    val total = latest.water + ml
-                    if (total > Validators.MAX_WATER_ML) {
-                        _events.send(
-                            DashboardEvent.Message(
-                                "That would exceed ${Validators.MAX_WATER_ML} ml for one entry",
-                                isError = true,
-                            ),
-                        )
-                        return@launch
+                val recordId = waterMutex.withLock {
+                    val day = LocalDate.now(clock)
+                    val waterEntry = repository.observeRecords(day, day).first() // newest first
+                        .firstOrNull { it.isWaterOnly && it.water + ml <= Validators.MAX_WATER_ML }
+                    if (waterEntry == null) {
+                        repository.addRecord(HealthRecord(date = day, water = ml))
+                    } else {
+                        repository.updateRecord(waterEntry.copy(water = waterEntry.water + ml))
+                        waterEntry.id
                     }
-                    repository.updateRecord(latest.copy(water = total))
                 }
-                _events.send(DashboardEvent.Message("Added $ml ml of water"))
+                _events.send(DashboardEvent.WaterAdded(ml, recordId))
             } catch (e: RepositoryException) {
                 _events.send(DashboardEvent.Message(e.message ?: "Could not add water.", isError = true))
+            }
+        }
+    }
+
+    /**
+     * Reverses a quick-add (snackbar "Undo"): subtracts the water again and
+     * removes the entry if nothing else is left in it.
+     */
+    fun undoQuickAddWater(event: DashboardEvent.WaterAdded) {
+        viewModelScope.launch {
+            try {
+                waterMutex.withLock {
+                    val record = repository.getRecord(event.recordId) ?: return@withLock
+                    val remaining = record.copy(water = (record.water - event.ml).coerceAtLeast(0))
+                    if (remaining.steps == 0 && remaining.calories == 0 && remaining.water == 0) {
+                        repository.deleteRecord(record.id)
+                    } else {
+                        repository.updateRecord(remaining)
+                    }
+                }
+            } catch (e: RepositoryException) {
+                _events.send(DashboardEvent.Message(e.message ?: "Could not undo.", isError = true))
             }
         }
     }

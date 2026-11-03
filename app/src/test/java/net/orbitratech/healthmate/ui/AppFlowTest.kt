@@ -1,6 +1,7 @@
 package net.orbitratech.healthmate.ui
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -165,13 +166,18 @@ class AppFlowTest {
     @Test
     fun tc08_quickAddWaterIncreasesTodaysWater() {
         val container = launch()
-        compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("+250 ml"))
-        compose.onNodeWithTag("quick_water_250").performClick()
-        compose.waitForIdle()
-        val todayWater = container.healthRecordRepository.all
+        fun todayWater() = container.healthRecordRepository.all
             .filter { it.date == TEST_TODAY }
             .sumOf { it.water }
-        assertEquals(2250, todayWater)
+        compose.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("quick_water_250"))
+        compose.onNodeWithTag("quick_water_250").performClick()
+        waitForText("Added 250 ml of water")
+        assertEquals(2250, todayWater())
+        compose.onNodeWithText("2,250", substring = true).assertExists()
+
+        // Undo from the snackbar takes the water back off.
+        compose.onNodeWithText("Undo").performClick()
+        compose.waitUntil(3_000) { todayWater() == 2000 }
     }
 
     @Test
