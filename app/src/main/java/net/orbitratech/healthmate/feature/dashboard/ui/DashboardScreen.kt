@@ -1,6 +1,7 @@
 package net.orbitratech.healthmate.feature.dashboard.ui
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,40 +12,53 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import net.orbitratech.healthmate.R
 import net.orbitratech.healthmate.core.designsystem.component.AppIcon
 import net.orbitratech.healthmate.core.designsystem.component.ConfirmDialog
@@ -52,6 +66,7 @@ import net.orbitratech.healthmate.core.designsystem.component.ErrorState
 import net.orbitratech.healthmate.core.designsystem.component.LocalAppSnackbar
 import net.orbitratech.healthmate.core.designsystem.component.ObserveEvents
 import net.orbitratech.healthmate.core.designsystem.component.SectionHeader
+import net.orbitratech.healthmate.core.designsystem.component.SingleLineText
 import net.orbitratech.healthmate.core.util.DateUtils
 import net.orbitratech.healthmate.core.util.Formatters
 import net.orbitratech.healthmate.feature.dashboard.ui.component.MetricProgressCard
@@ -75,6 +90,9 @@ fun DashboardScreen(
     ObserveEvents(viewModel.events) { event ->
         when (event) {
             is DashboardEvent.Message -> snackbar.show(event.text)
+            is DashboardEvent.WaterAdded -> snackbar.show(event.text, actionLabel = "Undo") {
+                viewModel.undoQuickAddWater(event)
+            }
         }
     }
     DashboardContent(
@@ -99,13 +117,18 @@ fun DashboardContent(
     onSeeAllToday: () -> Unit,
 ) {
     var pendingDelete by remember { mutableStateOf<HealthRecord?>(null) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    // The FAB shrinks to an icon once the user scrolls, so it covers less content.
+    val fabExpanded by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
 
     Scaffold(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onLogActivity,
+                expanded = fabExpanded,
                 modifier = Modifier.testTag("fab_log_activity"),
-                icon = { AppIcon(R.drawable.ic_add, null) },
+                icon = { AppIcon(R.drawable.ic_add, if (fabExpanded) null else "Log activity") },
                 text = { Text("Log activity") },
             )
         },
@@ -116,27 +139,36 @@ fun DashboardContent(
             }
             state.errorMessage != null -> ErrorState(state.errorMessage, Modifier.padding(padding))
             else -> LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .padding(padding)
                     .testTag("dashboard_list"),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                item { Header(state) }
-                item { SectionHeader("Today's activity", Modifier.padding(top = 8.dp)) }
+                item(key = "header") { Header(state) }
+                item(key = "activity_title") { SectionHeader("Today's activity", Modifier.padding(top = 4.dp)) }
                 HealthMetric.entries.forEach { metric ->
                     item(key = metric.name) {
                         MetricProgressCard(
                             metric = metric,
                             value = state.todaySummary.valueOf(metric),
                             goal = state.goals.goalFor(metric),
-                            onClick = { onSelectMetric(metric) },
+                            onClick = {
+                                // Show this metric's 7-day trend.
+                                onSelectMetric(metric)
+                                scope.launch { listState.animateScrollToItem(WEEKLY_CHART_INDEX) }
+                            },
+                            footer = if (metric == HealthMetric.WATER) {
+                                { QuickAddWater(onQuickAddWater) }
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
-                item { QuickWaterCard(state, onQuickAddWater) }
-                item { WeeklyCard(state, onSelectMetric) }
-                item {
+                item(key = "weekly") { WeeklyCard(state, onSelectMetric) }
+                item(key = "entries_title") {
                     SectionHeader("Today's entries", Modifier.padding(top = 8.dp)) {
                         if (state.todayEntries.isNotEmpty()) {
                             TextButton(onClick = onSeeAllToday) { Text("See all") }
@@ -144,7 +176,7 @@ fun DashboardContent(
                     }
                 }
                 if (state.todayEntries.isEmpty()) {
-                    item { NothingLoggedCard() }
+                    item(key = "nothing_logged") { NothingLoggedCard() }
                 } else {
                     state.todayEntries.forEachIndexed { index, record ->
                         item(key = "entry-${record.id}") {
@@ -178,67 +210,83 @@ fun DashboardContent(
     }
 }
 
+/** Position of the "Last 7 days" card: header, section title, then one card per metric. */
+private val WEEKLY_CHART_INDEX = 2 + HealthMetric.entries.size
+
 @Composable
 private fun Header(state: DashboardUiState) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 4.dp, end = 4.dp, top = 12.dp),
-        verticalAlignment = Alignment.Top,
     ) {
-        Column(Modifier.weight(1f)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "${DateUtils.greeting(state.now)} 👋",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Today – ${DateUtils.formatLong(state.today)}",
-                style = MaterialTheme.typography.headlineSmall,
-            )
+            if (state.streak > 0) StreakBadge(state.streak)
         }
-        if (state.streak > 0) {
-            Text(
-                "🔥 ${state.streak} day${if (state.streak == 1) "" else "s"}",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.tertiaryContainer)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            )
-        }
+        Spacer(Modifier.height(4.dp))
+        // The title gets the full width so the date stays on one line on narrow phones.
+        Text(
+            "Today – ${DateUtils.formatLong(state.today)}",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.semantics { heading() },
+        )
     }
 }
 
 @Composable
-private fun QuickWaterCard(state: DashboardUiState, onQuickAddWater: (Int) -> Unit) {
+private fun StreakBadge(streak: Int) {
+    val days = "$streak day${if (streak == 1) "" else "s"}"
+    Text(
+        "🔥 $days",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onTertiaryContainer,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .clearAndSetSemantics { contentDescription = "Logging streak: $days" },
+    )
+}
+
+/**
+ * One-tap water buttons shown inside the Water Intake card, right next to the
+ * total they change. Each tap is confirmed by a snackbar with Undo.
+ */
+@Composable
+private fun QuickAddWater(onQuickAddWater: (Int) -> Unit) {
     val water = HealthMetric.WATER
-    Card(colors = CardDefaults.cardColors(containerColor = water.color.copy(alpha = 0.08f))) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AppIcon(R.drawable.ic_local_drink, null, tint = water.color)
-                Spacer(Modifier.width(8.dp))
-                Text("Quick add water", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                Text(
-                    "${Formatters.percent(state.goals.progress(water, state.todaySummary.water))} of goal",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = water.color,
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                WATER_PRESETS.forEach { ml ->
-                    OutlinedButton(
-                        onClick = { onQuickAddWater(ml) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("quick_water_$ml"),
-                        border = BorderStroke(1.dp, water.color.copy(alpha = 0.4f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = water.color),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-                    ) { Text("+$ml ml") }
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppIcon(R.drawable.ic_local_drink, null, Modifier.size(18.dp), tint = water.color)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "Quick add water",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WATER_PRESETS.forEach { ml ->
+                FilledTonalButton(
+                    onClick = { onQuickAddWater(ml) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("quick_water_$ml")
+                        .semantics { contentDescription = "Add $ml ml of water" },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = water.color.copy(alpha = 0.12f),
+                        contentColor = water.color,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                ) {
+                    SingleLineText("+$ml ml", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
@@ -248,24 +296,24 @@ private fun QuickWaterCard(state: DashboardUiState, onQuickAddWater: (Int) -> Un
 @Composable
 private fun WeeklyCard(state: DashboardUiState, onSelectMetric: (HealthMetric) -> Unit) {
     val metric = state.chartMetric
+    val goal = state.goals.goalFor(metric)
     val best = state.bestDay(metric)
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.padding(16.dp)) {
-            Text("Last 7 days", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                HealthMetric.entries.forEachIndexed { index, m ->
-                    SegmentedButton(
-                        selected = m == metric,
-                        onClick = { onSelectMetric(m) },
-                        shape = SegmentedButtonDefaults.itemShape(index, HealthMetric.entries.size),
-                        icon = { AppIcon(m.icon, null, Modifier.size(18.dp)) },
-                        label = { Text(m.shortLabel, maxLines = 1) },
-                    )
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Last 7 days",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { heading() },
+                )
+                GoalLegend(metric, goal)
             }
+            Spacer(Modifier.height(12.dp))
+            MetricSelector(selected = metric, onSelect = onSelectMetric)
             Spacer(Modifier.height(16.dp))
-            WeeklyBarChart(days = state.trend, metric = metric, goal = state.goals.goalFor(metric))
+            WeeklyBarChart(days = state.trend, metric = metric, goal = goal)
             Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
             Spacer(Modifier.height(12.dp))
@@ -287,6 +335,80 @@ private fun WeeklyCard(state: DashboardUiState, onSelectMetric: (HealthMetric) -
                     state.daysGoalMet(metric).toString(),
                     "/ ${DashboardUiState.TREND_DAYS} days",
                     Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/** Explains the chart's dashed line, e.g. "- - Goal 10,000 steps". */
+@Composable
+private fun GoalLegend(metric: HealthMetric, goal: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Canvas(Modifier.size(width = 16.dp, height = 2.dp)) {
+            drawLine(
+                color = metric.color,
+                start = Offset(0f, size.height / 2),
+                end = Offset(size.width, size.height / 2),
+                strokeWidth = size.height,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 3.dp.toPx())),
+            )
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(
+            "Goal ${Formatters.number(goal)} ${metric.unit}",
+            style = MaterialTheme.typography.labelMedium,
+            color = metric.color,
+        )
+    }
+}
+
+/**
+ * Compact segmented control for the chart metric. Each segment shares the
+ * width equally and its label shrinks instead of wrapping on narrow screens.
+ */
+@Composable
+private fun MetricSelector(selected: HealthMetric, onSelect: (HealthMetric) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(4.dp)
+            .selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        HealthMetric.entries.forEach { metric ->
+            val isSelected = metric == selected
+            val container by animateColorAsState(
+                if (isSelected) metric.color.copy(alpha = 0.16f) else Color.Transparent,
+                label = "segment",
+            )
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 40.dp)
+                    .clip(CircleShape)
+                    .background(container)
+                    .selectable(selected = isSelected, onClick = { onSelect(metric) }, role = Role.Tab)
+                    .padding(horizontal = 8.dp)
+                    .testTag("chart_metric_${metric.name.lowercase()}"),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppIcon(
+                    metric.icon,
+                    null,
+                    Modifier.size(18.dp),
+                    tint = if (isSelected) metric.color else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(4.dp))
+                SingleLineText(
+                    metric.shortLabel,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    ),
+                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

@@ -21,6 +21,9 @@ data class HealthRecord(
 ) {
     val isNew: Boolean get() = id == 0L
 
+    /** An entry that only logs water, e.g. one created by the dashboard's quick-add buttons. */
+    val isWaterOnly: Boolean get() = steps == 0 && calories == 0 && water > 0
+
     fun valueOf(metric: HealthMetric): Int = when (metric) {
         HealthMetric.STEPS -> steps
         HealthMetric.CALORIES -> calories

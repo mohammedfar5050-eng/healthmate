@@ -6,16 +6,20 @@ import net.orbitratech.healthmate.core.util.DateUtils
 import net.orbitratech.healthmate.feature.records.ui.form.RecordFormViewModel
 import java.time.LocalDate
 
-/** Top-level destinations shown in the bottom navigation bar. */
+/**
+ * Top-level destinations shown in the bottom navigation bar. [hasFab] marks
+ * screens with a floating action button, so snackbars can be placed above it.
+ */
 enum class TopLevelDestination(
     val route: String,
     val label: String,
     @param:DrawableRes val icon: Int,
     @param:DrawableRes val selectedIcon: Int,
+    val hasFab: Boolean,
 ) {
-    DASHBOARD("dashboard", "Dashboard", R.drawable.ic_dashboard, R.drawable.ic_dashboard_filled),
-    RECORDS("records", "Records", R.drawable.ic_list, R.drawable.ic_list_filled),
-    SETTINGS("settings", "Settings", R.drawable.ic_settings, R.drawable.ic_settings_filled),
+    DASHBOARD("dashboard", "Dashboard", R.drawable.ic_dashboard, R.drawable.ic_dashboard_filled, hasFab = true),
+    RECORDS("records", "Records", R.drawable.ic_list, R.drawable.ic_list_filled, hasFab = true),
+    SETTINGS("settings", "Settings", R.drawable.ic_settings, R.drawable.ic_settings_filled, hasFab = false),
 }
 
 /** Add/Edit Record destination with optional `recordId` and `date` arguments. */

@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -103,10 +104,18 @@ private fun AppScaffold(snackbarHostState: SnackbarHostState) {
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val showBottomBar = TopLevelDestination.entries.any { it.route == currentRoute }
+    val currentTab = TopLevelDestination.entries.firstOrNull { it.route == currentRoute }
+    val showBottomBar = currentTab != null
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            // The FABs live in each screen's own Scaffold, so lift snackbars above
+            // them here (FAB 56 dp + 16 dp margin) instead of covering them.
+            SnackbarHost(
+                snackbarHostState,
+                Modifier.padding(bottom = if (currentTab?.hasFab == true) 72.dp else 0.dp),
+            )
+        },
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar {

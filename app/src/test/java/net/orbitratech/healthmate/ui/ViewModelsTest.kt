@@ -141,13 +141,26 @@ class ViewModelsTest {
     }
 
     @Test
-    fun dashboard_quickAddWater_updatesLatestEntry() = runTest {
+    fun dashboard_quickAddWater_collectsWaterInOneWaterOnlyEntry() = runTest {
         val vm = DashboardViewModel(repo, settings, TEST_CLOCK)
         keepCollecting { vm.uiState.collect {} }
+        val activityEntries = repo.all.filter { it.date == TEST_TODAY }
+
         vm.quickAddWater(250)
-        assertEquals(DashboardEvent.Message("Added 250 ml of water"), vm.events.first())
+        val first = vm.events.first() as DashboardEvent.WaterAdded
+        assertEquals("Added 250 ml of water", first.text)
         assertEquals(2250, vm.uiState.value.todaySummary.water)
-        assertEquals(2, vm.uiState.value.todayEntries.size)
+        assertEquals(3, vm.uiState.value.todayEntries.size) // a separate water entry
+
+        vm.quickAddWater(500)
+        val second = vm.events.first() as DashboardEvent.WaterAdded
+        assertEquals(first.recordId, second.recordId) // same water entry, no new row
+        assertEquals(2750, vm.uiState.value.todaySummary.water)
+        assertEquals(3, vm.uiState.value.todayEntries.size)
+        assertEquals(750, repo.all.single { it.id == first.recordId }.water)
+
+        // The activity entries the user typed in are never changed.
+        activityEntries.forEach { assertEquals(it, repo.all.single { r -> r.id == it.id }) }
     }
 
     @Test
@@ -158,6 +171,35 @@ class ViewModelsTest {
         vm.quickAddWater(500)
         assertEquals(500, vm.uiState.value.todaySummary.water)
         assertEquals(1, vm.uiState.value.todayEntries.size)
+    }
+
+    @Test
+    fun dashboard_quickAddWater_startsNewEntryAtPerEntryLimit() = runTest {
+        val nearlyFull = FakeHealthRecordRepository(listOf(HealthRecord(date = TEST_TODAY, water = 9_900)))
+        val vm = DashboardViewModel(nearlyFull, settings, TEST_CLOCK)
+        keepCollecting { vm.uiState.collect {} }
+        vm.quickAddWater(250)
+        assertTrue(vm.events.first() is DashboardEvent.WaterAdded)
+        assertEquals(listOf(9_900, 250), nearlyFull.all.sortedBy { it.id }.map { it.water })
+    }
+
+    @Test
+    fun dashboard_undoQuickAddWater_revertsEachTap() = runTest {
+        val vm = DashboardViewModel(repo, settings, TEST_CLOCK)
+        keepCollecting { vm.uiState.collect {} }
+        vm.quickAddWater(250)
+        val first = vm.events.first() as DashboardEvent.WaterAdded
+        vm.quickAddWater(250)
+        val second = vm.events.first() as DashboardEvent.WaterAdded
+        assertEquals(2500, vm.uiState.value.todaySummary.water)
+
+        vm.undoQuickAddWater(second)
+        assertEquals(2250, vm.uiState.value.todaySummary.water)
+        vm.undoQuickAddWater(first)
+        // The now-empty water entry is removed rather than left as an all-zero record.
+        assertEquals(2000, vm.uiState.value.todaySummary.water)
+        assertEquals(2, vm.uiState.value.todayEntries.size)
+        assertNull(repo.all.firstOrNull { it.id == first.recordId })
     }
 
     @Test
