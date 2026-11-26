@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,6 +87,9 @@ fun RecordsContent(
     onDeleteRecord: (HealthRecord) -> Unit,
 ) {
     var pendingDelete by remember { mutableStateOf<HealthRecord?>(null) }
+    val listState = rememberLazyListState()
+    // The FAB shrinks to an icon once the user scrolls, so it covers less of the list.
+    val fabExpanded by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
 
     Scaffold(
         topBar = {
@@ -103,8 +108,9 @@ fun RecordsContent(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddRecord,
+                expanded = fabExpanded,
                 modifier = Modifier.testTag("fab_add_record"),
-                icon = { AppIcon(R.drawable.ic_add, null) },
+                icon = { AppIcon(R.drawable.ic_add, if (fabExpanded) null else "Add record") },
                 text = { Text("Add record") },
             )
         },
@@ -144,6 +150,7 @@ fun RecordsContent(
                     },
                 )
                 else -> LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {

@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -24,6 +25,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
@@ -108,6 +110,30 @@ class ScreenshotCaptureTest {
         shot("09_settings")
         compose.onNodeWithTag("goal_water").performClick()
         shot("10_settings_edit_goal")
+    }
+
+    /** A 360 dp phone with a larger system font, to catch wrapped or clipped labels. */
+    @Test
+    @Config(qualifiers = "w360dp-h800dp-xhdpi", fontScale = 1.15f)
+    fun narrowPhone() {
+        launch()
+        shot("13_narrow_dashboard")
+        compose.onNodeWithTag("dashboard_list").performScrollToNode(hasText("Daily average"))
+        shot("14_narrow_dashboard_chart")
+        compose.onNodeWithTag("nav_records").performClick()
+        shot("15_narrow_records")
+        compose.onNodeWithTag("nav_settings").performClick()
+        shot("16_narrow_settings")
+    }
+
+    @Test
+    fun quickAddWater() {
+        launch()
+        compose.onNodeWithTag("quick_water_250").performClick()
+        compose.waitUntil(3_000) {
+            compose.onAllNodesWithText("Added 250 ml of water").fetchSemanticsNodes().isNotEmpty()
+        }
+        shot("17_quick_add_water")
     }
 
     @Test

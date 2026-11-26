@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import net.orbitratech.healthmate.R
 import net.orbitratech.healthmate.core.designsystem.component.AppIcon
@@ -93,19 +95,24 @@ fun MetricValue(metric: HealthMetric, value: Int, modifier: Modifier = Modifier)
     ) {
         AppIcon(metric.icon, null, tint = color, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(4.dp))
+        val style = MaterialTheme.typography.bodyMedium
         Text(
             text = buildAnnotatedString {
                 withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(Formatters.number(value)) }
                 if (metric != HealthMetric.STEPS) {
-                    withStyle(SpanStyle(fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                    // Relative size, so the unit shrinks together with the value below.
+                    withStyle(SpanStyle(fontSize = 0.86.em, color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                         append(" ${metric.unit}")
                     }
                 }
             },
-            style = MaterialTheme.typography.bodyMedium,
+            style = style,
             color = if (muted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
+            softWrap = false,
             overflow = TextOverflow.Ellipsis,
+            // Large values such as "1,250 kcal" shrink slightly instead of being cut off on narrow phones.
+            autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = style.fontSize, stepSize = 0.5.sp),
         )
     }
 }

@@ -73,7 +73,9 @@ fun WeeklyBarChart(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1.6f)
-            .semantics { contentDescription = "${metric.shortLabel} for the last 7 days: $description" }
+            .semantics {
+                contentDescription = "${metric.shortLabel} for the last 7 days, goal ${Formatters.number(goal)}: $description"
+            }
             .pointerInput(days, metric) {
                 detectTapGestures { offset ->
                     val left = 44.dp.toPx()
@@ -144,7 +146,8 @@ fun WeeklyBarChart(
             )
         }
 
-        // Goal line.
+        // Goal line. It is explained by the legend above the chart, so no label is
+        // drawn here where it would collide with today's bar.
         if (goal > 0) {
             val y = yOf(goal.toFloat())
             drawLine(
@@ -152,13 +155,7 @@ fun WeeklyBarChart(
                 start = Offset(leftAxis, y),
                 end = Offset(size.width, y),
                 strokeWidth = 1.5.dp.toPx(),
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f)),
-            )
-            drawLabel(
-                textMeasurer, "Goal",
-                Offset(size.width - 2.dp.toPx(), y - 9.dp.toPx()),
-                labelStyle.copy(color = metric.color, fontWeight = FontWeight.Bold),
-                alignRight = true,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 3.dp.toPx())),
             )
         }
 

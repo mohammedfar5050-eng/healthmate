@@ -42,17 +42,17 @@ HealthMate is a **native Android app** (Kotlin, Jetpack Compose, Material 3) for
 
 - **Daily goals** shown as animated progress rings. Goals are editable in Settings and stored with DataStore.
 - **7-day bar chart** drawn on a Compose `Canvas`:
-  - switch between metrics
-  - dashed goal line, with today's bar highlighted
+  - switch between metrics (or tap a metric card on the dashboard to jump to its trend)
+  - dashed goal line explained by a legend, with today's bar highlighted
   - tap a bar to see its value
   - stats below the chart: daily average, best day, days the goal was reached
 - **Logging streak:** consecutive days with at least one entry.
-- **Quick-add water** buttons (+250 / +500 / +750 ml) on the dashboard, and water presets on the form.
+- **Quick-add water** buttons (+250 / +500 / +750 ml) in the dashboard's Water card, and water presets on the form. Quick-added water is collected in one water-only entry per day, so activity entries are never changed, and every tap can be undone from the snackbar.
 - **Multiple entries per day**, totalled in SQL with `GROUP BY`.
 - **Swipe-to-delete with Undo**, and a **discard-changes guard** on the form.
 - **Light / Dark / System** theme, applied to the system bars too.
 - **Restore sample data** and **Delete all records** in Settings.
-- **Accessibility:** content descriptions on values and icons, 48 dp touch targets, and Material type scale support for font scaling.
+- **Accessibility:** content descriptions on values and icons, headings for screen readers, 48 dp touch targets, and Material type scale support for font scaling. Short labels shrink to fit instead of wrapping on narrow phones or with a large font size.
 
 ---
 
@@ -294,7 +294,7 @@ interface HealthRecordDao {
 
 - **Material 3 / Material You components** throughout:
   - `TopAppBar`, `NavigationBar`, `ExtendedFloatingActionButton`
-  - `Card`, `FilterChip`, `SegmentedButton`
+  - `Card`, `FilterChip`, `SegmentedButton`, `FilledTonalButton`
   - `OutlinedTextField`, `DatePickerDialog` / `DateRangePicker`
   - `SwipeToDismissBox`, `AlertDialog`, `Snackbar`
 - The design follows Android's edge-to-edge guidance and supports a light and a dark colour scheme generated from a teal seed colour, a calm "health" colour.
@@ -307,15 +307,17 @@ interface HealthRecordDao {
   - A bottom `NavigationBar` holds the three tabs: Dashboard, Records and Settings.
   - Each tab keeps its scroll position and filter.
   - The add/edit form opens as a full screen without the bottom bar. The system back gesture is guarded when there are unsaved changes.
-- **Feedback:** confirmation dialogs for destructive actions, snackbars with **Undo**, inline errors, empty, loading and error states, and an animated chart and progress rings.
-- **Reusable components:** `MetricIcon`, `MetricValue`, `RecordCard`, `DateFilterBar`, `MetricProgressCard`, `WeeklyBarChart`, `EmptyState`, `ErrorState`, `ConfirmDialog`, `SectionHeader`, `AppSnackbar`.
+- **Floating action buttons** shrink to an icon once a list is scrolled, so they cover less content, and snackbars appear above them rather than on top of them.
+- **Feedback:** confirmation dialogs for destructive actions, snackbars with **Undo** (deletes and quick-add water), inline errors, empty, loading and error states, and an animated chart and progress rings.
+- **Reusable components:** `MetricIcon`, `MetricValue`, `RecordCard`, `DateFilterBar`, `MetricProgressCard`, `WeeklyBarChart`, `EmptyState`, `ErrorState`, `ConfirmDialog`, `SectionHeader`, `SingleLineText`, `AppSnackbar`.
 
 The screens are shown in [`docs/screenshots`](docs/screenshots):
 
-- **Dashboard:** greeting, today's date, streak, three goal rings, quick-add water, 7-day chart with stats, and today's entries.
+- **Dashboard:** greeting, streak, today's date, three goal rings (quick-add water inside the Water card), 7-day chart with metric selector, goal legend and stats, and today's entries.
 - **Records:** filter chips, a summary of the filtered set, day groups with totals, swipe-to-delete, and a sort toggle.
 - **Add / Edit Record:** date picker, three validated numeric fields with units and goal hints, water presets, and delete when editing.
 - **Settings:** inline daily-goal editor with validation, theme selector, restore sample data, delete all, and About.
+- **Small phone (360 dp, larger font)** and **quick-add water** with its Undo snackbar: `13_` to `17_` screenshots.
 
 ---
 
@@ -339,7 +341,7 @@ Versions are pinned to the newest releases that work with **AGP 8.13 / compileSd
 
 ## 9. Testing
 
-**49 automated tests**, all run with `./gradlew testDebugUnitTest`. A further 5 screenshot-capture tests run only on request.
+**51 automated tests**, all run with `./gradlew testDebugUnitTest`. A further 7 screenshot-capture tests run only on request; they include a 360 dp phone with a larger system font (`13_`–`16_narrow_*.png`) to catch wrapped or clipped labels.
 
 | Test class | Type | What it covers |
 |---|---|---|
@@ -360,7 +362,7 @@ Versions are pinned to the newest releases that work with **AGP 8.13 / compileSd
 | TC-05 | Read and filter by date | Open Records; tap *Today*; tap *All* | 4 records in day groups → 2 records ("2 entries · 1 day") → 4 records | As expected | Pass |
 | TC-06 | Update a record | Tap the 6,400-step record, change to 6600, *Save changes* | Database row updated; list shows 6,600 | As expected | Pass |
 | TC-07 | Delete with confirmation and undo | ⋮ → Delete → confirm; tap *Undo* | Confirmation dialog; record removed; "Record deleted" snackbar; Undo restores it | As expected | Pass |
-| TC-08 | Quick-add water | Tap *+250 ml* on the dashboard | Today's water rises from 2,000 to 2,250 ml | As expected | Pass |
+| TC-08 | Quick-add water with Undo | Tap *+250 ml* in the dashboard's Water card; then tap *Undo* | "Added 250 ml of water" snackbar; today's water rises from 2,000 to 2,250 ml (in a separate water entry); Undo returns it to 2,000 ml | As expected | Pass |
 | TC-09 | Edit a daily goal with validation | Settings → Water goal → 0, *Save*; then 3000 | "Goal cannot be less than 1"; then "3,000 ml per day" | As expected | Pass |
 | TC-10 | Empty states | Launch with an empty database | Dashboard: "Nothing logged yet today…"; Records: "No records yet" | As expected | Pass |
 
@@ -378,6 +380,11 @@ Versions are pinned to the newest releases that work with **AGP 8.13 / compileSd
 | 6 | "Today" was wrong if the app stayed open past midnight | The date was read once at start-up | ViewModels refresh "today" on `ON_RESUME` |
 | 7 | Gradle and Robolectric downloads failed with HTTP 429 (Too Many Requests) | Rate limiting from Maven Central on the build machine's network | Used Google's Maven Central mirror through a user-level Gradle init script and an optional `robolectricRepoUrl` Gradle property; no project change needed elsewhere |
 | 8 | `captureToImage()` timed out in screenshot tests | Robolectric doesn't deliver the window frame callback that it waits for | Draw the activity's `decorView` onto a `Bitmap` using Robolectric's native graphics mode |
+| 9 | Quick-add water inflated an activity entry (e.g. an "Entry 2" with 7,250 ml) and was refused once that entry reached 10,000 ml | Each tap was added to the day's latest entry, whatever it was | Quick-added water now goes into one water-only entry per day (a new one is started when it is full). Each tap shows a snackbar with **Undo** |
+| 10 | Tapping a quick-add button several times quickly could lose a tap | Each tap read the entry and wrote it back; two overlapping taps both wrote "old value + 250" | The read-and-update runs under a coroutine `Mutex`, so taps are applied one after another |
+| 11 | On 360 dp phones labels wrapped or were cut off ("Calori-es" in the chart selector, "+250 / ml" on the water buttons) | Fixed paddings and icons left too little width for the text | A compact metric selector and `SingleLineText`, which shrinks the font instead of wrapping. A screenshot test renders a 360 dp phone with a larger font |
+| 12 | The *Log activity* button covered the quick-add buttons, and snackbars covered the button | The FAB is always expanded; the shared snackbar host sits in the app-level `Scaffold`, below each screen's FAB | Quick-add moved into the Water card (higher on the screen), FABs shrink to an icon when scrolled, and snackbars are lifted above the FAB |
+| 13 | The chart's "Goal" label overlapped today's bar, and tapping a metric card seemed to do nothing | The label was drawn inside the plot; the card changed the chart metric while the chart was off-screen | A legend above the chart explains the dashed goal line; tapping a metric card scrolls to its 7-day trend |
 
 ---
 

@@ -3,6 +3,8 @@ package net.orbitratech.healthmate.feature.dashboard.ui.component
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,11 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,8 +29,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -41,7 +45,8 @@ import net.orbitratech.healthmate.feature.records.model.HealthMetric
 
 /**
  * Today's value for one metric with an animated progress ring towards the
- * user's daily goal.
+ * user's daily goal. Tapping the summary calls [onClick]; an optional
+ * [footer] (e.g. quick-add buttons) is shown below it.
  */
 @Composable
 fun MetricProgressCard(
@@ -50,18 +55,24 @@ fun MetricProgressCard(
     goal: Int,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
+    footer: (@Composable () -> Unit)? = null,
 ) {
     val progress = if (goal <= 0) 0f else value.toFloat() / goal
     val reached = progress >= 1f
 
     Card(
-        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .testTag("today_${metric.name.lowercase()}"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClickLabel = "Show ${metric.shortLabel.lowercase()} trend", onClick = onClick)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             ProgressRing(metric, progress)
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
@@ -80,6 +91,7 @@ fun MetricProgressCard(
                         ) { append("  ${metric.unit}") }
                     },
                     style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
                 )
                 Text(
                     "Goal ${Formatters.number(goal)} ${metric.unit}",
@@ -87,14 +99,9 @@ fun MetricProgressCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Spacer(Modifier.width(8.dp))
             if (reached) {
-                AssistChip(
-                    onClick = onClick,
-                    label = { Text("Done") },
-                    leadingIcon = { AppIcon(R.drawable.ic_check_circle, null, Modifier.size(18.dp), tint = SuccessGreen) },
-                    colors = AssistChipDefaults.assistChipColors(containerColor = SuccessGreen.copy(alpha = 0.12f)),
-                    border = null,
-                )
+                GoalReachedBadge()
             } else {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(Formatters.number(goal - value), style = MaterialTheme.typography.titleSmall)
@@ -106,6 +113,30 @@ fun MetricProgressCard(
                 }
             }
         }
+        if (footer != null) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+            )
+            Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)) { footer() }
+        }
+    }
+}
+
+/** Status badge (not a button) shown once the daily goal is met. */
+@Composable
+private fun GoalReachedBadge() {
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(SuccessGreen.copy(alpha = 0.12f))
+            .padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppIcon(R.drawable.ic_check_circle, "Goal reached:", Modifier.size(18.dp), tint = SuccessGreen)
+        Spacer(Modifier.width(4.dp))
+        Text("Done", style = MaterialTheme.typography.labelLarge)
     }
 }
 

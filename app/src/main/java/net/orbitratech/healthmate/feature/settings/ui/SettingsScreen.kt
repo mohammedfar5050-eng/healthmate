@@ -46,6 +46,7 @@ import net.orbitratech.healthmate.core.designsystem.component.LocalAppSnackbar
 import net.orbitratech.healthmate.core.designsystem.component.MetricIcon
 import net.orbitratech.healthmate.core.designsystem.component.ObserveEvents
 import net.orbitratech.healthmate.core.designsystem.component.SectionHeader
+import net.orbitratech.healthmate.core.designsystem.component.SingleLineText
 import net.orbitratech.healthmate.core.util.Formatters
 import net.orbitratech.healthmate.core.util.Validators
 import net.orbitratech.healthmate.feature.records.model.HealthMetric
@@ -158,7 +159,7 @@ fun SettingsContent(
                                             Modifier.size(18.dp),
                                         )
                                     },
-                                    label = { Text(mode.label) },
+                                    label = { SingleLineText(mode.label) },
                                 )
                             }
                         }

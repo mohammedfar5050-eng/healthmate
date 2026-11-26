@@ -12,10 +12,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,11 +26,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.sp
 import net.orbitratech.healthmate.R
 import net.orbitratech.healthmate.feature.records.model.HealthMetric
 
@@ -37,7 +48,7 @@ fun AppIcon(
     @DrawableRes icon: Int,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    tint: androidx.compose.ui.graphics.Color = androidx.compose.material3.LocalContentColor.current,
+    tint: Color = LocalContentColor.current,
 ) {
     Icon(
         painter = painterResource(icon),
@@ -61,6 +72,32 @@ fun MetricIcon(metric: HealthMetric, modifier: Modifier = Modifier, size: Dp = 4
     }
 }
 
+/**
+ * Single-line label that shrinks its font (down to [minFontSize]) instead of
+ * wrapping or being cut off when space is tight, e.g. on narrow phones or with
+ * a large system font size.
+ */
+@Composable
+fun SingleLineText(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = LocalTextStyle.current,
+    color: Color = Color.Unspecified,
+    minFontSize: TextUnit = 10.sp,
+) {
+    val maxFontSize = if (style.fontSize.isSpecified) style.fontSize else 14.sp
+    Text(
+        text = text,
+        modifier = modifier,
+        color = color,
+        style = style,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        autoSize = TextAutoSize.StepBased(minFontSize = minFontSize, maxFontSize = maxFontSize, stepSize = 0.5.sp),
+    )
+}
+
 /** Section title used across screens. */
 @Composable
 fun SectionHeader(title: String, modifier: Modifier = Modifier, trailing: @Composable (() -> Unit)? = null) {
@@ -70,7 +107,13 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, trailing: @Compo
             .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { heading() },
+        )
         trailing?.invoke()
     }
 }
